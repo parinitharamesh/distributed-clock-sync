@@ -1,47 +1,46 @@
 import socket
 import time
 
+HOST = "0.0.0.0"
+PORT = 12345
+
 # Create UDP socket
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Add timeout handling
+# Bind server
+server_socket.bind((HOST, PORT))
+
+# Timeout so program doesn't freeze
 server_socket.settimeout(10)
 
-# Bind server to port
-server_address = ('0.0.0.0', 12345)
-server_socket.bind(server_address)
+print("Clock Sync Server Started...\n")
 
-print("Time Server running on port 12345...")
+try:
+    while True:
+        try:
+            # Receive request from client
+            data, addr = server_socket.recvfrom(1024)
 
-while True:
+            print(f"Request received from {addr}")
 
-    try:
-        # Wait for client request
-        data, client_address = server_socket.recvfrom(1024)
-
-        message = data.decode()
-
-        if message.startswith("TIME_REQUEST"):
-
-            print(f"Client {client_address} requested time")
-
-            # Record receive timestamp
+            # Server receive timestamp
             T2 = time.time()
 
-            # Record send timestamp
+            # Simulate small processing delay
+            time.sleep(0.001)
+
+            # Server send timestamp
             T3 = time.time()
 
+            # Send timestamps back
             response = f"{T2},{T3}"
+            server_socket.sendto(response.encode(), addr)
 
-            server_socket.sendto(response.encode(), client_address)
+        except socket.timeout:
+            continue
 
-            print(f"Response sent to {client_address}\n")
+except KeyboardInterrupt:
+    print("\nServer stopped.")
 
-        else:
-            print(f"Invalid request from {client_address}")
-
-    except socket.timeout:
-        print("No client requests received. Server still running...\n")
-
-    except Exception as e:
-        print("Server error:", e)
+finally:
+    server_socket.close()

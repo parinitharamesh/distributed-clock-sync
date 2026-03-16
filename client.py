@@ -10,59 +10,51 @@ CLIENT_ID = input("Enter Client ID: ")
 # Create UDP socket
 client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Add timeout handling
+# Timeout handling
 client.settimeout(5)
 
 print("\nClock Sync Client Started...\n")
 
-while True:
+try:
+    while True:
+        try:
+            # Record send time
+            T1 = time.time()
 
-    try:
-        # Record send time
-        T1 = time.time()
+            # Send sync request
+            client.sendto(b"SYNC", (SERVER_IP, PORT))
 
-        message = f"TIME_REQUEST:{CLIENT_ID}"
-        client.sendto(message.encode(), (SERVER_IP, PORT))
+            # Receive server timestamps
+            data, _ = client.recvfrom(1024)
 
-        # Receive response
-        data, addr = client.recvfrom(1024)
+            # Record receive time
+            T4 = time.time()
 
-        # Record receive time
-        T4 = time.time()
+            # Decode server timestamps
+            T2, T3 = map(float, data.decode().split(","))
 
-        # Extract timestamps
-        T2, T3 = map(float, data.decode().split(","))
+            # Calculate delay
+            delay = (T4 - T1) - (T3 - T2)
 
-        # Calculate delay
-        delay = (T4 - T1) - (T3 - T2)
+            # Calculate clock offset
+            offset = ((T2 - T1) + (T3 - T4)) / 2
 
-        # Calculate offset
-        offset = ((T2 - T1) + (T3 - T4)) / 2
+            # Correct local clock
+            local_time = time.time()
+            corrected_time = local_time + offset
 
-        # Calculate server time estimate
-        server_time = (T2 + T3) / 2
-        local_time = time.time()
+            print(f"\nClient ID: {CLIENT_ID}")
+            print(f"Network Delay: {delay:.6f} seconds")
+            print(f"Clock Offset: {offset:.6f} seconds")
+            print(f"Corrected Time: {time.ctime(corrected_time)}\n")
+            # Wait before next sync
+            time.sleep(5)
 
-        corrected_time = time.time() + offset
+        except socket.timeout:
+            print("Server not responding... retrying")
 
-        print("------ Synchronization Result ------")
-        print("Client ID:", CLIENT_ID)
-        print("Local Time:", time.ctime(local_time))
-        print("Server Time:", time.ctime(server_time))
-        print("Network Delay:", delay)
-        print("Clock Offset:", offset)
-        print("Corrected Time:", time.ctime(corrected_time))
-        print("-----------------------------------\n")
+except KeyboardInterrupt:
+    print("\nClient stopped.")
 
-        time.sleep(5)
-
-    except socket.timeout:
-        print("Server did not respond. Retrying...\n")
-
-    except Exception as e:
-        print("Client Error:", e)
-        break
-
-    except KeyboardInterrupt:
-        print("\nClient stopped.")
-        break
+finally:
+    client.close()
