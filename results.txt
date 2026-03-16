@@ -8,46 +8,43 @@ Port: 12345
 Number of Clients Tested: 3
 
 ------------------------------------------------
-
 Test 1 – Client 1
------------------
-Average Network Delay: ~0.0015 – 0.0023 seconds
-Average Clock Offset: ~0.0002 – 0.0010 seconds
+
+Average Network Delay: ~0.0007 – 0.0013 seconds
+Average Clock Offset: ~0.00013 – 0.00030 seconds
 
 Observation:
 Client 1 successfully synchronized with the server.
-Network delay remained low and stable.
+Network delay remained low after the initial synchronization.
 
 --------------------------------------------------
-
 Test 2 – Client 2
------------------
-Average Network Delay: ~0.0011 – 0.0017 seconds
-Average Clock Offset: ~0.00024 – 0.00069 seconds
+
+Average Network Delay: ~0.0010 – 0.0018 seconds
+Average Clock Offset: ~0.00019 – 0.00076 seconds
 
 Observation:
 Client 2 maintained stable communication with the server.
 Clock offset remained minimal.
 
 --------------------------------------------------
-
 Test 3 – Client 3
------------------
-Average Network Delay: ~0.0010 – 0.0027 seconds
-Average Clock Offset: ~0.00023 – 0.00121 seconds
+
+Average Network Delay: ~0.0007 – 0.0014 seconds
+Average Clock Offset: ~0.00015 – 0.00046 seconds
 
 Observation:
 Client 3 successfully synchronized with the server.
 Network delay fluctuated slightly but remained within acceptable limits.
 
---------------------------------------------------
+---------------------------------------------------
 
 Overall Observation
--------------------
+
 The system successfully handled multiple clients simultaneously.
-All clients were able to synchronize their clocks with the central server.
+All clients synchronized their clocks with the central server.
 
-Average delay remained low, indicating efficient UDP communication.
-Clock offset values were minimal, demonstrating accurate synchronization.
+Average network delay remained very low, demonstrating efficient UDP communication.
+Clock offset values were minimal, indicating accurate time synchronization across all clients.
 
-The system remained stable even with multiple clients running concurrently.
+The system remained stable even when multiple clients were running concurrently.
