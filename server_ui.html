@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Clock Sync — Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --panel: #0d1421;
+    --border: #1a2d4a;
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --warn: #ffb800;
+    --danger: #ff4455;
+    --text: #c8d8e8;
+    --dim: #4a6080;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, #0d1421 0%, #0a1628 100%);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 42px; height: 42px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 16px rgba(0,212,255,0.4);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(0,212,255,0.4); }
+    50% { box-shadow: 0 0 28px rgba(0,212,255,0.8); }
+  }
+
+  .logo-text h1 { font-size: 20px; font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+  .logo-text p  { font-size: 12px; color: var(--dim); letter-spacing: 1px; font-family: var(--mono); }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 16px;
+    border: 1px solid var(--accent2);
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: blink 1s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  main { padding: 24px 32px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--dim);
+    text-transform: uppercase;
+    font-family: var(--mono);
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 26px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-sub {
+    font-size: 11px;
+    color: var(--dim);
+    font-family: var(--mono);
+    margin-top: 6px;
+  }
+
+  /* Two column layout */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,212,255,0.04);
+  }
+
+  .panel-title {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: var(--mono);
+  }
+
+  .panel-badge {
+    margin-left: auto;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* Log */
+  #log {
+    height: 340px;
+    overflow-y: auto;
+    padding: 10px 0;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  #log::-webkit-scrollbar { width: 4px; }
+  #log::-webkit-scrollbar-track { background: var(--panel); }
+  #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-row {
+    display: grid;
+    grid-template-columns: 70px 90px 70px 130px 120px 120px;
+    align-items: center;
+    padding: 7px 18px;
+    border-bottom: 1px solid rgba(26,45,74,0.5);
+    animation: fadeIn 0.3s ease;
+    transition: background 0.2s;
+  }
+
+  .log-row:hover { background: rgba(0,212,255,0.04); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-row.new {
+    background: rgba(0,212,255,0.08);
+  }
+
+  .col-time   { color: var(--dim); }
+  .col-client { color: var(--accent2); font-weight: bold; }
+  .col-seq    { color: var(--dim); }
+  .col-delay  { color: var(--warn); }
+  .col-offset { color: var(--accent); }
+  .col-time2  { color: var(--text); font-size: 11px; }
+
+  .log-header {
+    display: grid;
+    grid-template-columns: 70px 90px 70px 130px 120px 120px;
+    padding: 6px 18px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  /* Clients panel */
+  #clients-list { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 340px; }
+
+  .client-card {
+    background: rgba(0,212,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .client-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .client-name {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--accent2);
+    font-weight: bold;
+  }
+
+  .client-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+  }
+
+  .mini-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .mini-stat { font-family: var(--mono); font-size: 11px; }
+  .mini-stat span { color: var(--accent); }
+
+  /* Summary panel */
+  .summary-panel {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0,212,255,0.1);
+    display: none;
+  }
+
+  .summary-panel.show { display: block; animation: fadeIn 0.4s ease; }
+
+  .summary-header {
+    padding: 12px 18px;
+    background: rgba(0,212,255,0.08);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .summary-title { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+
+  .summary-body { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .summary-stats { display: flex; flex-direction: column; gap: 8px; }
+
+  .s-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 12px; }
+  .s-key { color: var(--dim); }
+  .s-val { color: var(--accent2); }
+
+  .summary-times { border-left: 1px solid var(--border); padding-left: 16px; }
+  .summary-times-title { font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: 1px; margin-bottom: 8px; text-transform: uppercase; }
+  .summary-times-list { display: flex; flex-direction: column; gap: 4px; }
+  .summary-times-list div { font-family: var(--mono); font-size: 11px; color: var(--text); }
+
+  #empty-state {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px;
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⏱</div>
+    <div class="logo-text">
+      <h1>CLOCK SYNC SERVER</h1>
+      <p>UDP · AES-128 · STOP-AND-WAIT ARQ</p>
+    </div>
+  </div>
+  <div class="status-pill"><div class="dot"></div> LISTENING ON :12345</div>
+</header>
+
+<main>
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Requests</div>
+      <div class="stat-value" id="total-requests">0</div>
+      <div class="stat-sub">all clients</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Clients</div>
+      <div class="stat-value" id="active-clients">0</div>
+      <div class="stat-sub">connected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Network Delay</div>
+      <div class="stat-value" id="avg-delay">—</div>
+      <div class="stat-sub">seconds</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Clock Offset</div>
+      <div class="stat-value" id="avg-offset">—</div>
+      <div class="stat-sub">seconds</div>
+    </div>
+  </div>
+
+  <!-- Log + clients -->
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Live Request Log</div>
+        <div class="panel-badge" id="log-count">0 packets</div>
+      </div>
+      <div class="log-header">
+        <span>Time</span><span>Client</span><span>Seq</span>
+        <span>Delay (s)</span><span>Offset (s)</span><span>Corrected Time</span>
+      </div>
+      <div id="log"><div id="empty-state">Waiting for packets...</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Client Tracker</div>
+        <div class="panel-badge" id="client-count">0 clients</div>
+      </div>
+      <div id="clients-list"></div>
+    </div>
+  </div>
+
+  <!-- Summary (shown every 10 requests) -->
+  <div class="summary-panel" id="summary-panel">
+    <div class="summary-header">
+      <div class="summary-title">📊 10-Request Summary</div>
+      <span id="summary-client" style="font-family:var(--mono);font-size:12px;color:var(--accent2);margin-left:10px;"></span>
+    </div>
+    <div class="summary-body">
+      <div class="summary-stats" id="summary-stats"></div>
+      <div class="summary-times">
+        <div class="summary-times-title">Last 10 Corrected Times</div>
+        <div class="summary-times-list" id="summary-times"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  let totalRequests = 0;
+  let allDelays = [], allOffsets = [];
+  let clients = {};
+
+  const log         = document.getElementById('log');
+  const logCount    = document.getElementById('log-count');
+  const emptyState  = document.getElementById('empty-state');
+  const clientsList = document.getElementById('clients-list');
+  const clientCount = document.getElementById('client-count');
+
+  function updateGlobalStats() {
+    document.getElementById('total-requests').textContent = totalRequests;
+    document.getElementById('active-clients').textContent = Object.keys(clients).length;
+    if (allDelays.length) {
+      document.getElementById('avg-delay').textContent = (allDelays.reduce((a,b)=>a+b,0)/allDelays.length).toFixed(5);
+      document.getElementById('avg-offset').textContent = (allOffsets.reduce((a,b)=>a+b,0)/allOffsets.length).toFixed(5);
+    }
+  }
+
+  function renderClients() {
+    clientsList.innerHTML = '';
+    const entries = Object.entries(clients);
+    clientCount.textContent = `${entries.length} client${entries.length !== 1 ? 's' : ''}`;
+    if (!entries.length) {
+      clientsList.innerHTML = '<div style="padding:20px;font-family:var(--mono);font-size:12px;color:var(--dim);text-align:center;">No clients yet</div>';
+      return;
+    }
+    entries.forEach(([id, c]) => {
+      const avgD = c.delays.length ? (c.delays.reduce((a,b)=>a+b,0)/c.delays.length).toFixed(5) : '—';
+      const avgO = c.offsets.length ? (c.offsets.reduce((a,b)=>a+b,0)/c.offsets.length).toFixed(5) : '—';
+      clientsList.innerHTML += `
+        <div class="client-card">
+          <div class="client-card-top">
+            <div class="client-name">${id}</div>
+            <div class="client-count">${c.count} reqs</div>
+          </div>
+          <div class="mini-stats">
+            <div class="mini-stat">Avg Delay: <span>${avgD}s</span></div>
+            <div class="mini-stat">Avg Offset: <span>${avgO}s</span></div>
+          </div>
+        </div>`;
+    });
+  }
+
+  const es = new EventSource('http://localhost:5000/stream');
+
+  es.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping') return;
+
+    if (msg.type === 'request') {
+      const d = msg.data;
+      totalRequests++;
+      allDelays.push(d.delay);
+      allOffsets.push(d.offset);
+
+      if (!clients[d.client_id]) clients[d.client_id] = { count: 0, delays: [], offsets: [] };
+      clients[d.client_id].count++;
+      clients[d.client_id].delays.push(d.delay);
+      clients[d.client_id].offsets.push(d.offset);
+
+      // Remove empty state
+      if (emptyState) emptyState.remove();
+
+      const row = document.createElement('div');
+      row.className = 'log-row new';
+      row.innerHTML = `
+        <span class="col-time">${d.time}</span>
+        <span class="col-client">${d.client_id}</span>
+        <span class="col-seq">#${d.seq}</span>
+        <span class="col-delay">${d.delay}</span>
+        <span class="col-offset">${d.offset}</span>
+        <span class="col-time2">${d.corrected}</span>`;
+      log.prepend(row);
+      setTimeout(() => row.classList.remove('new'), 600);
+
+      logCount.textContent = `${totalRequests} packets`;
+      updateGlobalStats();
+      renderClients();
+    }
+
+    if (msg.type === 'summary') {
+      const d = msg.data;
+      const panel = document.getElementById('summary-panel');
+      panel.classList.add('show');
+      document.getElementById('summary-client').textContent = `${d.client_id} — ${d.total} total requests`;
+      document.getElementById('summary-stats').innerHTML = `
+        <div class="s-row"><span class="s-key">Avg Delay</span><span class="s-val">${d.avg_delay}s</span></div>
+        <div class="s-row"><span class="s-key">Min Delay</span><span class="s-val">${d.min_delay}s</span></div>
+        <div class="s-row"><span class="s-key">Max Delay</span><span class="s-val">${d.max_delay}s</span></div>
+        <div class="s-row"><span class="s-key">Avg Offset</span><span class="s-val">${d.avg_offset}s</span></div>
+        <div class="s-row"><span class="s-key">Total Requests</span><span class="s-val">${d.total}</span></div>`;
+      document.getElementById('summary-times').innerHTML =
+        d.last_10_times.map((t, i) => `<div>[${i+1}] ${t}</div>`).join('');
+    }
+
+    if (msg.type === 'security') {
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:8px 18px;font-family:var(--mono);font-size:11px;color:var(--danger);background:rgba(255,68,85,0.05);border-bottom:1px solid rgba(255,68,85,0.2);';
+      row.textContent = `⚠ SECURITY: ${msg.data.msg} from ${msg.data.addr}`;
+      log.prepend(row);
+    }
+  };
+
+  es.onerror = () => {
+    document.querySelector('.status-pill').style.borderColor = 'var(--danger)';
+    document.querySelector('.status-pill').style.color = 'var(--danger)';
+    document.querySelector('.dot').style.background = 'var(--danger)';
+    document.querySelector('.status-pill').lastChild.textContent = ' DISCONNECTED';
+  };
+</script>
+</body>
+</html>
